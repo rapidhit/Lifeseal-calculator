@@ -1,0 +1,143 @@
+@import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@400;500;600;700;800&display=swap');
+@import 'tailwindcss';
+@import 'tw-animate-css';
+@plugin "@tailwindcss/typography";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+  --color-border: hsl(var(--border));
+  --color-input: hsl(var(--input));
+  --color-ring: hsl(var(--ring));
+
+  --color-card: hsl(var(--card));
+  --color-card-foreground: hsl(var(--card-foreground));
+  --color-card-border: hsl(var(--card-border));
+
+  --color-popover: hsl(var(--popover));
+  --color-popover-foreground: hsl(var(--popover-foreground));
+  --color-popover-border: hsl(var(--popover-border));
+
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+
+  --color-secondary: hsl(var(--secondary));
+  --color-secondary-foreground: hsl(var(--secondary-foreground));
+
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+
+  --color-accent: hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+
+  --color-destructive: hsl(var(--destructive));
+  --color-destructive-foreground: hsl(var(--destructive-foreground));
+
+  --color-success: hsl(var(--success));
+  --color-success-foreground: hsl(var(--success-foreground));
+  
+  --color-warning: hsl(var(--warning));
+  --color-warning-foreground: hsl(var(--warning-foreground));
+
+  --font-sans: var(--app-font-sans);
+  --font-serif: var(--app-font-serif);
+  
+  --radius-sm: calc(var(--radius) - 8px);
+  --radius-md: calc(var(--radius) - 4px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 8px);
+  --radius-2xl: calc(var(--radius) + 12px);
+  --radius-3xl: calc(var(--radius) + 16px);
+  --radius-full: 9999px;
+}
+
+:root {
+  /* Cute light warm palette */
+  --background: 40 33% 98%; /* soft warm cream */
+  --foreground: 250 30% 25%; /* soft deep blue-purple for text */
+  
+  --border: 40 20% 90%;
+  --input: 0 0% 100%;
+  --ring: 340 85% 65%;
+
+  --card: 0 0% 100%;
+  --card-foreground: 250 30% 25%;
+  --card-border: 40 20% 92%;
+
+  --popover: 0 0% 100%;
+  --popover-foreground: 250 30% 25%;
+  --popover-border: 40 20% 92%;
+
+  /* Cheerful warm pink/coral */
+  --primary: 340 85% 65%;
+  --primary-foreground: 0 0% 100%;
+
+  /* Soft sunny yellow for secondary */
+  --secondary: 45 95% 65%;
+  --secondary-foreground: 250 40% 20%;
+
+  --muted: 40 25% 94%;
+  --muted-foreground: 250 15% 55%;
+
+  /* Soft lavender accent */
+  --accent: 270 70% 75%;
+  --accent-foreground: 250 40% 20%;
+
+  --destructive: 350 85% 65%;
+  --destructive-foreground: 0 0% 100%;
+  
+  --success: 150 65% 45%;
+  --success-foreground: 0 0% 100%;
+
+  --warning: 40 95% 60%;
+  --warning-foreground: 40 40% 20%;
+
+  --app-font-sans: 'Nunito', sans-serif;
+  --app-font-serif: 'Fredoka', sans-serif;
+  
+  --radius: 1.25rem; /* 20px */
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply font-sans antialiased bg-background text-foreground;
+    background-image: 
+      radial-gradient(circle at 10% 20%, rgba(255, 107, 158, 0.08) 0%, transparent 40%),
+      radial-gradient(circle at 90% 80%, rgba(255, 185, 78, 0.08) 0%, transparent 40%),
+      radial-gradient(circle at 50% 50%, rgba(175, 122, 255, 0.06) 0%, transparent 60%);
+    background-attachment: fixed;
+  }
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-serif font-semibold text-foreground;
+  }
+}
+
+@layer utilities {
+  .magic-glow {
+    box-shadow: 0 10px 40px -10px hsl(var(--primary) / 0.3), 
+                0 0 20px 0 hsl(var(--secondary) / 0.2);
+  }
+  
+  .text-glow {
+    text-shadow: 0 2px 10px hsl(var(--primary) / 0.2);
+  }
+
+  .number-seal {
+    @apply flex items-center justify-center rounded-2xl border-[3px] border-primary/20 bg-primary/5 text-primary font-serif font-bold;
+  }
+
+  .cute-shadow {
+    box-shadow: 0 8px 30px -4px rgba(0,0,0,0.03), 0 4px 10px -2px rgba(0,0,0,0.02);
+  }
+  
+  .delay-100 { transition-delay: 100ms; animation-delay: 100ms; }
+  .delay-200 { transition-delay: 200ms; animation-delay: 200ms; }
+  .delay-300 { transition-delay: 300ms; animation-delay: 300ms; }
+  .delay-400 { transition-delay: 400ms; animation-delay: 400ms; }
+  .delay-500 { transition-delay: 500ms; animation-delay: 500ms; }
+}

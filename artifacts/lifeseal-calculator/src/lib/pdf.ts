@@ -1,10 +1,12 @@
-// Client-side "Download as PDF" using html2canvas + jsPDF.
+// Client-side "Download as PDF" using html2canvas-pro + jsPDF.
+// (html2canvas-pro, not html2canvas: Tailwind v4 emits oklch() colors,
+// which classic html2canvas 1.4.x cannot parse — renders blank output.)
 // Strategy: clone the target node into <body> at a fixed visible position
 // so html2canvas always captures it at known coordinates, then remove the clone.
 
 export async function downloadReadingPdf(node: HTMLElement, filename: string): Promise<void> {
   const [html2canvasModule, jspdfModule] = await Promise.all([
-    import('html2canvas'),
+    import('html2canvas-pro'),
     import('jspdf'),
   ])
 

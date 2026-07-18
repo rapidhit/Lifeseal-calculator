@@ -1,8 +1,16 @@
 // Client-side "Download as PDF" using html2canvas-pro + jsPDF.
 // (html2canvas-pro, not html2canvas: Tailwind v4 emits oklch() colors,
 // which classic html2canvas 1.4.x cannot parse — renders blank output.)
-// Strategy: clone the target node into <body> at a fixed visible position
-// so html2canvas always captures it at known coordinates, then remove the clone.
+//
+// Pagination strategy: ONE SECTION PER PAGE. Each direct child of the
+// target node is captured on its own, so no two details ever share a page
+// and no card is ever sliced through the middle. Sections taller than an
+// A4 page are scaled down to fit; only extremely tall ones (below 55%
+// legibility) are allowed to continue onto extra pages — still alone.
+
+const PAGE_MARGIN_PT = 28
+const CAPTURE_WIDTH = 1100
+const MIN_FIT_SCALE = 0.55
 
 export async function downloadReadingPdf(node: HTMLElement, filename: string): Promise<void> {
   const [html2canvasModule, jspdfModule] = await Promise.all([
@@ -11,72 +19,105 @@ export async function downloadReadingPdf(node: HTMLElement, filename: string): P
   ])
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const html2canvas = ((html2canvasModule as any).default ?? html2canvasModule) as (el: HTMLElement, opts?: Record<string, unknown>) => Promise<HTMLCanvasElement>
+  const html2canvas = ((html2canvasModule as any).default ?? html2canvasModule) as (
+    el: HTMLElement,
+    opts?: Record<string, unknown>,
+  ) => Promise<HTMLCanvasElement>
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const JsPDF = (jspdfModule as any).jsPDF ?? (jspdfModule as any).default
 
   if (typeof html2canvas !== 'function') throw new Error('html2canvas failed to load')
   if (!JsPDF) throw new Error('jsPDF failed to load')
 
-  // Clone the node and inject it at (0,0) so html2canvas sees it inside the viewport.
-  // zIndex: -9999 keeps it behind all real UI; pointer-events: none blocks interaction.
-  const clone = node.cloneNode(true) as HTMLElement
-  Object.assign(clone.style, {
-    position:      'fixed',
-    top:           '0',
-    left:          '0',
-    width:         '1100px',
-    zIndex:        '-9999',
-    pointerEvents: 'none',
-  })
-  document.body.appendChild(clone)
+  // Direct children of the wrapper are the sections. If the wrapper holds a
+  // single inner container, descend one level so we still get real sections.
+  let sections = Array.from(node.children) as HTMLElement[]
+  if (sections.length === 1 && sections[0].children.length > 1) {
+    sections = Array.from(sections[0].children) as HTMLElement[]
+  }
+  sections = sections.filter((s) => s.offsetHeight > 0)
+  if (sections.length === 0) sections = [node]
 
-  try {
-    const canvas = await html2canvas(clone, {
-      scale:           2,
-      useCORS:         true,
-      allowTaint:      true,
-      backgroundColor: '#f7f4ec',
-      logging:         false,
-      scrollX:         0,
-      scrollY:         0,
-      windowWidth:     1100,
+  const pdf = new JsPDF({ unit: 'pt', format: 'a4' })
+  const pageW = pdf.internal.pageSize.getWidth() as number
+  const pageH = pdf.internal.pageSize.getHeight() as number
+  const availW = pageW - PAGE_MARGIN_PT * 2
+  const availH = pageH - PAGE_MARGIN_PT * 2
+
+  let firstPage = true
+
+  for (const section of sections) {
+    // Wrap the clone so each capture carries the parchment background
+    // and breathing room, at a fixed width for consistent layout.
+    const wrap = document.createElement('div')
+    Object.assign(wrap.style, {
+      position:      'fixed',
+      top:           '0',
+      left:          '0',
+      width:         `${CAPTURE_WIDTH}px`,
+      zIndex:        '-9999',
+      pointerEvents: 'none',
+      background:    '#f7f4ec',
+      padding:       '40px',
+      boxSizing:     'border-box',
     })
+    wrap.appendChild(section.cloneNode(true))
+    document.body.appendChild(wrap)
 
-    const pdf         = new JsPDF({ unit: 'pt', format: 'a4' })
-    const pageWidth   = pdf.internal.pageSize.getWidth()  as number
-    const pageHeight  = pdf.internal.pageSize.getHeight() as number
-    const pxPerPt     = canvas.width / pageWidth
-    const pageHeightPx = pageHeight * pxPerPt
+    try {
+      const canvas = await html2canvas(wrap, {
+        scale:           2,
+        useCORS:         true,
+        allowTaint:      true,
+        backgroundColor: '#f7f4ec',
+        logging:         false,
+        scrollX:         0,
+        scrollY:         0,
+        windowWidth:     CAPTURE_WIDTH,
+      })
 
-    let renderedPx = 0
-    let firstPage  = true
-
-    while (renderedPx < canvas.height) {
-      const sliceH  = Math.min(pageHeightPx, canvas.height - renderedPx)
-      const tmp     = document.createElement('canvas')
-      tmp.width     = canvas.width
-      tmp.height    = sliceH
-      const ctx     = tmp.getContext('2d')!
-      ctx.drawImage(canvas, 0, renderedPx, canvas.width, sliceH, 0, 0, canvas.width, sliceH)
+      const widthFitH = (canvas.height * availW) / canvas.width
 
       if (!firstPage) pdf.addPage()
-      pdf.addImage(
-        tmp.toDataURL('image/png'),
-        'PNG',
-        0, 0,
-        pageWidth,
-        (sliceH * pageWidth) / canvas.width,
-        undefined,
-        'FAST',
-      )
-      firstPage   = false
-      renderedPx += sliceH
-    }
+      firstPage = false
 
-    pdf.save(`${filename}.pdf`)
-  } finally {
-    // Always clean up the clone, even if capture threw
-    document.body.removeChild(clone)
+      if (widthFitH <= availH) {
+        // Fits on one page at full width — centre it vertically.
+        const y = PAGE_MARGIN_PT + (availH - widthFitH) / 2
+        pdf.addImage(canvas.toDataURL('image/png'), 'PNG', PAGE_MARGIN_PT, y, availW, widthFitH, undefined, 'FAST')
+      } else if (availH / widthFitH >= MIN_FIT_SCALE) {
+        // Taller than a page but still legible when scaled to fit —
+        // shrink to page height and centre horizontally.
+        const scale = availH / widthFitH
+        const w = availW * scale
+        const x = PAGE_MARGIN_PT + (availW - w) / 2
+        pdf.addImage(canvas.toDataURL('image/png'), 'PNG', x, PAGE_MARGIN_PT, w, availH, undefined, 'FAST')
+      } else {
+        // Extremely tall section: keep full width and let it continue on
+        // additional pages — but never sharing a page with another section.
+        const pxPerPt = canvas.width / availW
+        const pageHeightPx = availH * pxPerPt
+        let renderedPx = 0
+        let firstSlice = true
+        while (renderedPx < canvas.height) {
+          const sliceH = Math.min(pageHeightPx, canvas.height - renderedPx)
+          const tmp = document.createElement('canvas')
+          tmp.width = canvas.width
+          tmp.height = sliceH
+          const ctx = tmp.getContext('2d')!
+          ctx.fillStyle = '#f7f4ec'
+          ctx.fillRect(0, 0, tmp.width, tmp.height)
+          ctx.drawImage(canvas, 0, renderedPx, canvas.width, sliceH, 0, 0, canvas.width, sliceH)
+          if (!firstSlice) pdf.addPage()
+          pdf.addImage(tmp.toDataURL('image/png'), 'PNG', PAGE_MARGIN_PT, PAGE_MARGIN_PT, availW, (sliceH * availW) / canvas.width, undefined, 'FAST')
+          firstSlice = false
+          renderedPx += sliceH
+        }
+      }
+    } finally {
+      document.body.removeChild(wrap)
+    }
   }
+
+  pdf.save(`${filename}.pdf`)
 }

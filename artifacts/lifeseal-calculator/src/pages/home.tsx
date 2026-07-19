@@ -118,31 +118,61 @@ function SlideShow({ slides, className, onFirstSwipe }: { slides: React.ReactNod
   const [api, setApi] = React.useState<CarouselApi>()
   const [current, setCurrent] = React.useState(0)
   const [count, setCount] = React.useState(0)
+  const [canPrev, setCanPrev] = React.useState(false)
+  const [canNext, setCanNext] = React.useState(false)
+  const [inView, setInView] = React.useState(false)
   const swiped = React.useRef(false)
+  const containerRef = React.useRef<HTMLDivElement>(null)
+
+  // The floating controls only show while the slideshow is on screen.
+  React.useEffect(() => {
+    const el = containerRef.current
+    if (!el || typeof IntersectionObserver === 'undefined') return
+    const io = new IntersectionObserver(
+      ([entry]) => setInView(entry.isIntersecting),
+      { threshold: 0.05 },
+    )
+    io.observe(el)
+    return () => io.disconnect()
+  }, [])
 
   React.useEffect(() => {
     if (!api) return
-    setCount(api.scrollSnapList().length)
-    setCurrent(api.selectedScrollSnap() + 1)
-    
-    const onSelect = () => {
+    const sync = () => {
+      setCount(api.scrollSnapList().length)
       setCurrent(api.selectedScrollSnap() + 1)
+      setCanPrev(api.canScrollPrev())
+      setCanNext(api.canScrollNext())
+    }
+    sync()
+
+    const onSelect = () => {
+      sync()
       if (!swiped.current) {
         swiped.current = true
         onFirstSwipe?.()
       }
+      // After a swipe, bring the top of the new card into view so the
+      // reader starts at its beginning instead of mid-scroll.
+      requestAnimationFrame(() => {
+        const el = containerRef.current
+        if (!el) return
+        if (el.getBoundingClientRect().top < -8) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+        }
+      })
     }
     api.on("select", onSelect)
-    api.on("reInit", onSelect)
+    api.on("reInit", sync)
     
     return () => {
       api.off("select", onSelect)
-      api.off("reInit", onSelect)
+      api.off("reInit", sync)
     }
   }, [api, onFirstSwipe])
 
   return (
-    <div className={`relative w-full mx-auto ${className || ''}`}>
+    <div ref={containerRef} className={`relative w-full mx-auto scroll-mt-24 ${className || ''}`}>
       <Carousel setApi={setApi} className="w-full" opts={{ loop: false, align: 'start' }}>
         <CarouselContent className="-ml-2 md:-ml-4 items-stretch">
           {slides.map((slide, index) => (
@@ -163,6 +193,38 @@ function SlideShow({ slides, className, onFirstSwipe }: { slides: React.ReactNod
           </div>
         )}
       </Carousel>
+
+      {/* Floating navigator — visible while the slideshow is on screen */}
+      {count > 1 && inView && (
+        <div className="fixed bottom-5 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 rounded-full bg-white/95 backdrop-blur-md border border-primary/15 shadow-xl shadow-primary/10 px-3 py-2 animate-in fade-in slide-in-from-bottom-4 duration-300">
+          <button
+            type="button"
+            aria-label="Previous detail"
+            onClick={() => api?.scrollPrev()}
+            disabled={!canPrev}
+            className="h-10 w-10 rounded-full flex items-center justify-center bg-primary/5 text-primary transition hover:bg-primary/15 disabled:opacity-30 disabled:pointer-events-none"
+          >
+            <ChevronLeft className="w-5 h-5" />
+          </button>
+          <span className="text-sm font-bold text-foreground tracking-wide tabular-nums whitespace-nowrap px-1">
+            {current} <span className="opacity-40">/</span> {count}
+            {count - current > 0 && (
+              <span className="ml-2 text-xs font-semibold text-muted-foreground">
+                {count - current} left
+              </span>
+            )}
+          </span>
+          <button
+            type="button"
+            aria-label="Next detail"
+            onClick={() => api?.scrollNext()}
+            disabled={!canNext}
+            className="h-10 w-10 rounded-full flex items-center justify-center bg-primary/5 text-primary transition hover:bg-primary/15 disabled:opacity-30 disabled:pointer-events-none"
+          >
+            <ChevronRight className="w-5 h-5" />
+          </button>
+        </div>
+      )}
     </div>
   )
 }

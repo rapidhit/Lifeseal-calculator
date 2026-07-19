@@ -6,11 +6,19 @@ RUN npm install -g pnpm@10
 
 WORKDIR /app
 
-# Copy the entire workspace so pnpm can resolve all packages
-COPY . .
+# 1) Copy ONLY the dependency manifests first. This layer — and the heavy
+#    package download below — stays cached between deploys and only re-runs
+#    when the lockfile actually changes. Code-only pushes skip it entirely.
+COPY pnpm-lock.yaml pnpm-workspace.yaml ./
 
-# Install all workspace dependencies using the committed lockfile
-RUN pnpm install --frozen-lockfile
+# Pre-download every package into the pnpm store using just the lockfile.
+# Low network concurrency keeps memory/network pressure gentle on small servers.
+RUN pnpm fetch --network-concurrency 4
+
+# 2) Now copy the workspace and link dependencies from the local store
+#    (no re-download; falls back to network only if something is missing).
+COPY . .
+RUN pnpm install --frozen-lockfile --prefer-offline
 
 # Build the frontend
 # BASE_PATH=/ because Coolify serves the app at the root

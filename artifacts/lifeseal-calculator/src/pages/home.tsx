@@ -1079,13 +1079,15 @@ export default function LifeSealCalculator() {
                 <SlideShow slides={personalSlides} onFirstSwipe={() => setShowSwipeHint(false)} />
               </div>
 
-              {/* OFFSCREEN PDF CONTAINER — fixed+top keeps left:0 so html2canvas coords are reliable */}
+              {/* OFFSCREEN PDF CONTAINER — each data-pdf-section becomes its own PDF page */}
               <div className="pointer-events-none" style={{ position: 'fixed', top: 0, left: '-9999px', width: '1100px' }}>
-                <div ref={pdfRef} className="space-y-16 bg-[#f7f4ec] p-12">
-                  {heroSeal}
-                  <div className="grid gap-6 md:grid-cols-2 lg:gap-8 max-w-5xl mx-auto">
-                    {personalSlides}
-                  </div>
+                <div ref={pdfRef} className="space-y-10 bg-[#f7f4ec] p-12">
+                  <div data-pdf-section>{heroSeal}</div>
+                  {personalSlides.map((slide, i) => (
+                    <div data-pdf-section key={i}>
+                      {slide}
+                    </div>
+                  ))}
                 </div>
               </div>
             </div>

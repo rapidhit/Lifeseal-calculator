@@ -29,14 +29,21 @@ export async function downloadReadingPdf(node: HTMLElement, filename: string): P
   if (typeof html2canvas !== 'function') throw new Error('html2canvas failed to load')
   if (!JsPDF) throw new Error('jsPDF failed to load')
 
-  // Direct children of the wrapper are the sections. If the wrapper holds a
-  // single inner container, descend one level so we still get real sections.
-  let sections = Array.from(node.children) as HTMLElement[]
-  if (sections.length === 1 && sections[0].children.length > 1) {
-    sections = Array.from(sections[0].children) as HTMLElement[]
-  }
+  // Sections are explicitly tagged with data-pdf-section in the markup —
+  // no structural guessing. Keep only the outermost tagged elements.
+  let sections = Array.from(node.querySelectorAll<HTMLElement>('[data-pdf-section]'))
+  sections = sections.filter((s) => !sections.some((o) => o !== s && o.contains(s)))
   sections = sections.filter((s) => s.offsetHeight > 0)
-  if (sections.length === 0) sections = [node]
+  if (sections.length === 0) {
+    // Fallback for untagged content: direct children, descending one level
+    // if the wrapper holds a single inner container.
+    sections = Array.from(node.children) as HTMLElement[]
+    if (sections.length === 1 && sections[0].children.length > 1) {
+      sections = Array.from(sections[0].children) as HTMLElement[]
+    }
+    sections = sections.filter((s) => s.offsetHeight > 0)
+    if (sections.length === 0) sections = [node]
+  }
 
   const pdf = new JsPDF({ unit: 'pt', format: 'a4' })
   const pageW = pdf.internal.pageSize.getWidth() as number

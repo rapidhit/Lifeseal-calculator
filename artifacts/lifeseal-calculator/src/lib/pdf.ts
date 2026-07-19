@@ -45,6 +45,34 @@ export async function downloadReadingPdf(node: HTMLElement, filename: string): P
     if (sections.length === 0) sections = [node]
   }
 
+  // Full-screen opaque overlay: hides the capture scaffolding (the clones
+  // bleed through translucent cards otherwise) and shows live progress.
+  const overlay = document.createElement('div')
+  Object.assign(overlay.style, {
+    position:       'fixed',
+    inset:          '0',
+    zIndex:         '2147483000',
+    background:     '#f7f4ec',
+    display:        'flex',
+    flexDirection:  'column',
+    alignItems:     'center',
+    justifyContent: 'center',
+    gap:            '14px',
+    textAlign:      'center',
+    padding:        '24px',
+  })
+  overlay.innerHTML = `
+    <style>@keyframes lfs-spin { to { transform: rotate(360deg); } }</style>
+    <div style="width:44px;height:44px;border-radius:50%;border:4px solid #e9dcc9;border-top-color:#d63e6c;animation:lfs-spin 0.9s linear infinite"></div>
+    <div style="font-size:18px;font-weight:700;color:#23273a">Preparing your PDF…</div>
+    <div data-pdf-progress style="font-size:14px;color:#6d7288">Starting…</div>
+    <div style="font-size:12px;color:#9a9fb0">Please keep this page open — it only takes a moment.</div>
+  `
+  const progressEl = overlay.querySelector('[data-pdf-progress]') as HTMLElement
+  document.body.appendChild(overlay)
+  const prevOverflow = document.body.style.overflow
+  document.body.style.overflow = 'hidden'
+
   const pdf = new JsPDF({ unit: 'pt', format: 'a4' })
   const pageW = pdf.internal.pageSize.getWidth() as number
   const pageH = pdf.internal.pageSize.getHeight() as number
@@ -53,7 +81,9 @@ export async function downloadReadingPdf(node: HTMLElement, filename: string): P
 
   let firstPage = true
 
-  for (const section of sections) {
+  try {
+  for (const [i, section] of sections.entries()) {
+    if (progressEl) progressEl.textContent = `Rendering page ${i + 1} of ${sections.length}…`
     // Wrap the clone so each capture carries the parchment background
     // and breathing room, at a fixed width for consistent layout.
     const wrap = document.createElement('div')
@@ -126,5 +156,10 @@ export async function downloadReadingPdf(node: HTMLElement, filename: string): P
     }
   }
 
+  if (progressEl) progressEl.textContent = 'Saving your file…'
   pdf.save(`${filename}.pdf`)
+  } finally {
+    document.body.style.overflow = prevOverflow
+    overlay.remove()
+  }
 }
